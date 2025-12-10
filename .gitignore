@@ -1,0 +1,56 @@
+# .gitignore para proyectos con n8n
+# Mantiene los flujos JSON que quieras versionar, pero ignora secretos, DB y archivos temporales.
+
+# Node / package
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Env / secretos
+.env
+.env.*
+.env.local
+
+# n8n: ignorar datos de ejecución y credenciales
+.n8n/
+# Ignorar credenciales y DB por seguridad
+.n8n/credentials.json
+.n8n/personal_data.json
+.n8n/database.sqlite
+.n8n/database.sqlite-shm
+.n8n/database.sqlite-wal
+# Ignorar ejecuciones, logs y temporales
+.n8n/executions/
+.n8n/tmp/
+.n8n/logs/
+
+# Pero permitir los archivos de flujo JSON (ajusta nombres según tu exportación)
+!.n8n/flows.json
+!.n8n/flows_*.json
+!.n8n/*.workflow.json
+
+# Si guardas flujos en la raíz o en una carpeta "workflows" permite esos JSON explícitos:
+!flows.json
+!flows_*.json
+!workflows/
+!workflows/*.json
+
+# Builds / outputs
+dist/
+build/
+coverage/
+coverage-final.json
+
+# IDEs / Sistema
+.vscode/
+.idea/
+*.sublime-workspace
+*.sublime-project
+.DS_Store
+Thumbs.db
+
+# Logs generales
+logs/
+*.log
