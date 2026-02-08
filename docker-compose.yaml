@@ -26,8 +26,14 @@ services:
     container_name: browserless_chrome
     restart: always
     ports:
-      - "3000:3000"  # Puerto por donde n8n enviará las instrucciones
+      - "3000:3000"
     environment:
-      - MAX_CONCURRENT_SESSIONS=10 # Limita cuantas pestañas se abren a la vez para no colgar tu PC
-      - DEBUG=browserless* # (Opcional) Ayuda a ver logs si algo falla
-    shm_size: '2gb' # Importante para que Chrome no se crashee por falta de memoria compartida
+      - MAX_CONCURRENT_SESSIONS=10
+      - DEBUG=browserless*
+      # --- AGREGAR ESTO PARA EVADIR DETECCIÓN ---
+      - STEALTH_EVASIONS=1         # Activa plugins para ocultar que es un bot
+      - HEADLESS=false             # A veces ayuda simular que tiene cabeza (aunque corre en servidor)
+      - ENABLE_CORS=true
+      - KEEP_ALIVE=true
+      - CONNECTION_TIMEOUT=300000  # 5 minutos de timeout
+    shm_size: '2gb'
