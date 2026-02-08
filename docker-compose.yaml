@@ -3,12 +3,12 @@ services:
     image: postgres:15
     container_name: postgres_evolution
     restart: always
-    environment: # credenciales de ejemplo, recomendado cambiar
+    environment:
       - POSTGRES_USER=docker
       - POSTGRES_PASSWORD=password
       - POSTGRES_DB=evolution_db
     ports:
-      - "5433:5432" # Si tienen una bdd aparte dejar el primer puerto
+      - "5433:5432"
     volumes:
       - ./postgres_data:/var/lib/postgresql/data
 
@@ -17,5 +17,17 @@ services:
     container_name: redis_evolution
     restart: always
     ports:
-      - "6379:6379" # Mapeo de puertos para que NVM lo vea
+      - "6379:6379"
     command: redis-server --appendonly yes
+
+  # --- NUEVO SERVICIO AGREGADO ---
+  browserless:
+    image: ghcr.io/browserless/chromium:latest
+    container_name: browserless_chrome
+    restart: always
+    ports:
+      - "3000:3000"  # Puerto por donde n8n enviará las instrucciones
+    environment:
+      - MAX_CONCURRENT_SESSIONS=10 # Limita cuantas pestañas se abren a la vez para no colgar tu PC
+      - DEBUG=browserless* # (Opcional) Ayuda a ver logs si algo falla
+    shm_size: '2gb' # Importante para que Chrome no se crashee por falta de memoria compartida
