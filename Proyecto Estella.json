@@ -1554,8 +1554,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        -2640,
-        832
+        -2688,
+        928
       ],
       "id": "cd35c7a8-e218-44bb-90a4-127b13beb966",
       "name": "Scraping Firecrawl",
@@ -3596,7 +3596,7 @@
     "binaryMode": "separate",
     "availableInMCP": false
   },
-  "versionId": "285d5636-902e-4c1a-86b9-1963b6e2e6a4",
+  "versionId": "27a95bcf-b209-4c4a-8f98-e81c01ffc9a3",
   "meta": {
     "instanceId": "b905138399e5b42c9fc6893b6996dfc787612886f5893af219e106ccc3424870"
   },
