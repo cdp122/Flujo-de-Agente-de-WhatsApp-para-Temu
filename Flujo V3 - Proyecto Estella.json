@@ -1,0 +1,2521 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "/*******************************\n * CONFIGURACIÓN GENERAL\n *******************************/\nconst dominio_evolution = \"http://localhost:8080\";\n\n/*******************************\n * WHITELIST DE NÚMEROS\n *******************************/\nconst numeros_admitidos = [\n  \"593997350897\",\n  \"593980062977\",\n  \"593978640544\",\n  \"593997129254\",\n  \"593995817315\",\n  \"593988207600\"\n];\n\n/*******************************\n * FUNCIÓN WHITELIST\n *******************************/\nfunction comprobar_whitelist(numero, evolutional) {\n  if (!numero) return false;\n\n  // Limpiar número si viene de evolution\n  const numero_limpio =\n    evolutional && typeof numero === \"string\"\n      ? numero.split(\"@\")[0]\n      : numero;\n\n  // Si el mensaje es enviado por el bot, cortamos flujo\n  if (evolutional && $input.first().json.body?.data?.key?.fromMe) {\n    return null; // señal explícita de corte\n  }\n\n  return numeros_admitidos.includes(numero_limpio);\n}\n\n/*******************************\n * OBJETO BASE\n *******************************/\nlet datos = {\n  dominio_evolution\n};\n\n/*******************************\n * TRIGGER DESDE CONSOLA\n *******************************/\nif ($input.first().json.action) {\n  datos.tipo_trigger = \"consola\";\n  datos.numero_cuenta = \"Consola\";\n  datos.nombre_contacto = \"Admin\";\n  datos.mensaje_texto = $input.first().json.chatInput;\n\n  return datos;\n}\n\n/*******************************\n * TRIGGER DESDE EVOLUTION API\n *******************************/\nif ($input.first().json.body?.data?.messageType) {\n  const body = $input.first().json.body;\n\n  datos.tipo_trigger = \"evolution\";\n\n  const permitido = comprobar_whitelist(\n    body.data.key.remoteJid,\n    true\n  );\n\n  // Cortar flujo si es mensaje propio del bot\n  if (permitido === null) {\n    return [];\n  }\n\n  datos.is_testing = permitido;\n\n  datos.instancia = body.instance;\n  datos.numero_cuenta = body.data.key.remoteJid;\n\n  // SOLUCIÓN NOMBRE NULL O NUMÉRICO\n  const pushName = body.data.pushName;\n  datos.nombre_contacto =\n    pushName && isNaN(pushName) ? pushName : \"Cliente\";\n\n  datos.id_mensaje = body.data.key.id;\n  datos.tipo_mensaje = body.data.messageType;\n\n  datos.mensaje_texto =\n    body.data.message.conversation ||\n    body.data.message.imageMessage?.caption ||\n    \"\";\n\n  return datos;\n}\n\n/*******************************\n * SI NO COINCIDE NINGÚN TRIGGER\n *******************************/\nreturn [];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -5152,
+        384
+      ],
+      "id": "bb9c7426-6de8-4239-a3f9-71f4a3ccdf93",
+      "name": "DataCleaning 1"
+    },
+    {
+      "parameters": {
+        "options": {
+          "allowFileUploads": true,
+          "allowedFilesMimeTypes": "images/jpeg, images/png"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        -5376,
+        576
+      ],
+      "id": "b98df0e7-dcc8-4c1a-af30-f2e84f0ca6a8",
+      "name": "Mensaje Consola",
+      "webhookId": "9257e4ab-a164-4fb9-a60f-c58b7bbff75b"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        416,
+        560
+      ],
+      "id": "7b7049ae-ee84-40bb-92d6-3a8b8045c3b1",
+      "name": "Finalizar Trigger Mensaje"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('DataCleaning 1').item.json.dominio_evolution }}/chat/markMessageAsRead/{{ $('DataCleaning 1').item.json.instancia }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1088,
+        176
+      ],
+      "id": "141c8713-a80a-4338-8cba-e207c9a7aa09",
+      "name": "Marcar como leído",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "q1F1LLl7zF8DrCOs",
+          "name": "EvolutionApi ApiKey"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('DataCleaning 1').item.json.dominio_evolution }}/chat/sendPresence/{{ $('DataCleaning 1').item.json.instancia }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n    \"number\": \"{{ $('DataCleaning 1').item.json.numero_cuenta }}\",\n    \"presence\": \"composing\",\n    \"delay\": 1200\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1536,
+        176
+      ],
+      "id": "85033526-0571-431f-a470-f3de97903751",
+      "name": "Enviar estado \"escribiendo\"",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "q1F1LLl7zF8DrCOs",
+          "name": "EvolutionApi ApiKey"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('DataCleaning 1').item.json.dominio_evolution }}/message/sendText/{{ $('DataCleaning 1').item.json.instancia }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"number\": \"{{ $('DataCleaning 1').item.json.numero_cuenta }}\",\n  \"text\": {{ JSON.stringify($('IA Contestadora').item.json.output) }},\n  \"delay\": {{ max(($('IA Contestadora').item.json.output.split(' ').length + ($('IA Contestadora').item.json.output.match(/[¿?¡!,]/g) || []).length)/1.25, 5) * 1000 }}\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1760,
+        176
+      ],
+      "id": "a06915fb-b94f-4e51-8715-5c78a2a21ed3",
+      "name": "Enviar mensaje",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "q1F1LLl7zF8DrCOs",
+          "name": "EvolutionApi ApiKey"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('DataCleaning 1').item.json.dominio_evolution }}/instance/setPresence/{{ $('DataCleaning 1').item.json.instancia }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"presence\": \"available\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        416,
+        176
+      ],
+      "id": "a90884a4-79a9-44cb-a7d3-e9cb5774149a",
+      "name": "Enviar Estado Disponible",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "q1F1LLl7zF8DrCOs",
+          "name": "EvolutionApi ApiKey"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('DataCleaning 1').item.json.dominio_evolution }}/instance/setPresence/{{ $('DataCleaning 1').item.json.instancia }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n    \"presence\": \"unavailable\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1984,
+        176
+      ],
+      "id": "e945057f-d402-43ea-9744-4008af61d48c",
+      "name": "Enviar Estado No Disponible",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "q1F1LLl7zF8DrCOs",
+          "name": "EvolutionApi ApiKey"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "Permite el inicio del flujo de wp por medio de Evolution API y la Api Oficial",
+        "height": 112,
+        "width": 150
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -4672,
+        272
+      ],
+      "id": "abae4f14-a7b0-423f-8e59-107262087ece",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "prueba",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -5376,
+        192
+      ],
+      "id": "0df271b4-badc-4d22-991e-d9a83d2bc3b8",
+      "name": "Evolution API",
+      "webhookId": "06639a56-5d7d-45fc-a9c4-09ff2539a3f5"
+    },
+    {
+      "parameters": {
+        "updates": [
+          "messages"
+        ],
+        "options": {}
+      },
+      "type": "n8n-nodes-base.whatsAppTrigger",
+      "typeVersion": 1,
+      "position": [
+        -5376,
+        384
+      ],
+      "id": "48bb5cbc-3788-4263-9c76-8f89a8f500c6",
+      "name": "WP API Oficial",
+      "webhookId": "3a9967b8-955e-47d4-abf4-2d05af6cceed",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "content": "Se limpia la data antes de procesar el mensaje",
+        "height": 80,
+        "width": 150
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -5168,
+        528
+      ],
+      "id": "332d963f-6b94-4368-9519-85a887342a00",
+      "name": "Sticky Note4"
+    },
+    {
+      "parameters": {
+        "content": "El mensaje es procesado por Ollama con un modelo local",
+        "height": 80,
+        "width": 230
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -480,
+        624
+      ],
+      "id": "a1d11d78-da90-4461-9fca-9a88aa1cc1e2",
+      "name": "Sticky Note5"
+    },
+    {
+      "parameters": {
+        "content": "Redirige la forma de respuesta acorde al API usada",
+        "height": 96,
+        "width": 150
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        176,
+        544
+      ],
+      "id": "00308593-50a5-4839-93fd-ce777ccf9a65",
+      "name": "Sticky Note6"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "e4738183-84e5-4804-b9c7-b30df8e36bab",
+                    "leftValue": "={{ $('DataCleaning 1').item.json.tipo_trigger }}",
+                    "rightValue": "evolution",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Mensaje Evolution"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "8229d7f5-e955-4f70-bf52-ac52d57ddbd7",
+                    "leftValue": "={{ $('DataCleaning 1').item.json.tipo_trigger }}",
+                    "rightValue": "oficial",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Mensaje Api Oficial"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('DataCleaning 1').item.json.tipo_trigger }}",
+                    "rightValue": "consola",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "f3c95741-37a7-4fa2-bd71-0e78143dec16"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Mensaje Consola"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        192,
+        352
+      ],
+      "id": "a57e196d-3c6d-42a4-80da-ba1cc3e6cb20",
+      "name": "Redirección Respuesta"
+    },
+    {
+      "parameters": {
+        "content": "El Do Nothing es solo visual",
+        "height": 80,
+        "width": 256
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        416,
+        736
+      ],
+      "id": "46503f4b-cd27-4ca0-ae8e-1ce73e6fa35e",
+      "name": "Sticky Note8"
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "925355883990190",
+        "recipientPhoneNumber": "={{ $('WP API Oficial').item.json.contacts[0].wa_id }}",
+        "textBody": "={{ $json.output }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        416,
+        368
+      ],
+      "id": "add06a85-ed2e-47d2-a1e2-7916a64732c5",
+      "name": "Send message",
+      "webhookId": "b6999954-fd1a-469d-87fc-e42cdcb86a7e",
+      "credentials": {
+        "whatsAppApi": {
+          "id": "pV8OZI5A6zT7baVC",
+          "name": "WP API Sender"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "Finalmente envia el mensaje y quita el estado de disponible para parecer que envío el mensaje y se desconectó",
+        "height": 80,
+        "width": 512
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1120,
+        64
+      ],
+      "id": "daacb9ba-497a-45d4-8d77-3c79b7698333",
+      "name": "Sticky Note7"
+    },
+    {
+      "parameters": {
+        "content": "Marca como disponible y leído el mensaje. Usa Redis para poder marcar varios mensajes en una sola http request",
+        "height": 80,
+        "width": 544
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -16,
+        64
+      ],
+      "id": "32d2c003-1351-4b46-b45c-e1e92f9d36fe",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "content": "Borra esos IDS de Redis. Luego envía el estado de \"escribiendo\". Luego empieza un retraso y hace parecer que está escribiendo para mantener la salud de la cuenta",
+        "height": 80,
+        "width": 416
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        624,
+        64
+      ],
+      "id": "d2dd18d0-5af6-4a40-93b4-c63f84a206d1",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "operation": "push",
+        "list": "={{ $json.numero_cuenta }}",
+        "messageData": "={{ $json.mensaje_texto || '[Imagen/Archivo recibido]' }}"
+      },
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        -4208,
+        448
+      ],
+      "id": "4012a5c3-dee2-4530-a56c-a0903d657d22",
+      "name": "Guardar Mensajes",
+      "credentials": {
+        "redis": {
+          "id": "yD0K1YyhMbPXBziG",
+          "name": "Redis account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "propertyName": "mensajes",
+        "key": "={{ $('DataCleaning 1').item.json.numero_cuenta }}",
+        "keyType": "list",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        -3760,
+        448
+      ],
+      "id": "a9538a4c-9cdd-4a5a-a96a-d6f411baca0c",
+      "name": "Conseguir Mensajes",
+      "credentials": {
+        "redis": {
+          "id": "yD0K1YyhMbPXBziG",
+          "name": "Redis account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "Con Redis guardamos los mensajes, en caso de que sea el tipo de usuario que prefierem mandar mensajes por separado",
+        "height": 80,
+        "width": 822
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -4224,
+        624
+      ],
+      "id": "24ac2ab6-4f39-4e38-973c-3710a0ed1528",
+      "name": "Sticky Note9"
+    },
+    {
+      "parameters": {
+        "operation": "push",
+        "list": "={{ $json.numero_cuenta + \"_idmsj\" }}",
+        "messageData": "={{ $json.id_mensaje }}"
+      },
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        -4480,
+        560
+      ],
+      "id": "a90cccf3-196c-4ac3-8fe3-6c388235ac1a",
+      "name": "Guardar IDs Mensajes",
+      "credentials": {
+        "redis": {
+          "id": "yD0K1YyhMbPXBziG",
+          "name": "Redis account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "3450a370-b9b2-474a-88f7-40ff5c9fa58b",
+              "leftValue": "={{ $json.tipo_trigger }}",
+              "rightValue": "evolution",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -4704,
+        464
+      ],
+      "id": "46d78c6f-0e12-45bb-a14e-52265545b487",
+      "name": "¿Guardar ID Mensajes?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "e00c265e-d235-411c-b46b-a507bb704338",
+              "leftValue": "={{ $json.tipo_trigger }}",
+              "rightValue": "consola",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -4880,
+        384
+      ],
+      "id": "dea94280-1625-46d4-a2c0-1f2ad03eb8fa",
+      "name": "¿Mensaje tipo consola?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "7d075c2e-edb0-4894-a62b-390d8e5c3f2e",
+              "leftValue": "={{ $json.mensajes.length }}",
+              "rightValue": "=0",
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -3536,
+        448
+      ],
+      "id": "629c9c5b-2aa4-44b5-9820-8ebd45f9c387",
+      "name": "¿Ya no hay mas mensajes?"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "propertyName": "IDMensaje",
+        "key": "={{ $('DataCleaning 1').item.json.numero_cuenta + \"_idmsj\" }}",
+        "keyType": "list",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        640,
+        176
+      ],
+      "id": "0660ec35-882c-466f-bab9-33a36eadff56",
+      "name": "Conseguir ID Mensaje",
+      "credentials": {
+        "redis": {
+          "id": "yD0K1YyhMbPXBziG",
+          "name": "Redis account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "var mensajes = {\n    \"readMessages\" : []\n}\n\n// 1. Obtenemos la lista original\nconst raw_ids = $input.first().json.IDMensaje;\n\n// 2. EL TRUCO: Usamos 'Set' para eliminar duplicados automáticamente\n// (Un Set es una lista que no permite valores repetidos)\nconst id_mensajes = [...new Set(raw_ids)].reverse();\n\nconst remoteJid = $('DataCleaning 1').first().json.numero_cuenta;\n\n// 3. Ahora recorremos solo la lista limpia\nfor (const id_mensaje of id_mensajes) {\n    mensajes.readMessages.push({\n        \"remoteJid\": remoteJid,\n        \"fromMe\": false,\n        \"id\": id_mensaje\n    });\n}\n\nreturn [ { json : mensajes } ]"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        864,
+        176
+      ],
+      "id": "9ec60b9a-b39b-4b4d-a1e6-95de62591cc3",
+      "name": "Estructurar Body Request"
+    },
+    {
+      "parameters": {
+        "operation": "delete",
+        "key": "={{ $('DataCleaning 1').item.json.numero_cuenta + \"_idmsj\"}}"
+      },
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        1312,
+        176
+      ],
+      "id": "d3626a6a-ebbf-4029-8b6f-e3a0f909bbb3",
+      "name": "Borrar IDs Mensajes",
+      "credentials": {
+        "redis": {
+          "id": "yD0K1YyhMbPXBziG",
+          "name": "Redis account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1984,
+        560
+      ],
+      "id": "5ba4fe27-2b90-4c26-841d-8c3be571c9d7",
+      "name": "No Operation, do nothing1"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        640,
+        560
+      ],
+      "id": "eb23b5b9-2827-4b16-852b-bb4029bca039",
+      "name": "No Operation, do nothing2"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        864,
+        560
+      ],
+      "id": "95f15d1d-bece-4268-a611-5cf679110995",
+      "name": "No Operation, do nothing3"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1088,
+        560
+      ],
+      "id": "2ea756d7-8de5-4c62-a3dd-b9cf9ca1d377",
+      "name": "No Operation, do nothing4"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1312,
+        560
+      ],
+      "id": "48a5ba85-e97f-4d9d-a661-e1b81523d114",
+      "name": "No Operation, do nothing5"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1536,
+        560
+      ],
+      "id": "7d35a7ba-fae3-44e4-b2f1-79758db13fb9",
+      "name": "No Operation, do nothing6"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1760,
+        560
+      ],
+      "id": "dbcd2c83-a9cf-4c14-8bde-9f47a3d35df2",
+      "name": "No Operation, do nothing7"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1984,
+        368
+      ],
+      "id": "4925dcea-7124-4622-97df-07180129d740",
+      "name": "No Operation, do nothing8"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        640,
+        368
+      ],
+      "id": "62900436-c0e9-46f6-9b97-9b9d9401db3e",
+      "name": "No Operation, do nothing9"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        864,
+        368
+      ],
+      "id": "ed3511c8-0566-4e53-a6e0-0e2b407cd9c9",
+      "name": "No Operation, do nothing10"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1088,
+        368
+      ],
+      "id": "7dfb91ff-b24d-4452-86c9-a22dff5109fe",
+      "name": "No Operation, do nothing11"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1312,
+        368
+      ],
+      "id": "2c6fe79b-c0c0-48f9-82f2-29a801cbcd41",
+      "name": "No Operation, do nothing12"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1536,
+        368
+      ],
+      "id": "b5791f34-d53d-4ec4-a090-99a9346580d1",
+      "name": "No Operation, do nothing13"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1760,
+        368
+      ],
+      "id": "34453804-41e0-41b7-95f0-ac27572d9f01",
+      "name": "No Operation, do nothing14"
+    },
+    {
+      "parameters": {
+        "amount": "={{ $('DataCleaning 1').item.json.is_testing ? 0 : 60 }}"
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -3984,
+        448
+      ],
+      "id": "06ae7366-67e0-47d4-adc7-77a7543ae206",
+      "name": "Esperar a mas mensajes",
+      "webhookId": "6be83ec4-644f-41b5-a6ef-c4b18f0dce16"
+    },
+    {
+      "parameters": {
+        "amount": "={{ $('DataCleaning 1').item.json.is_testing ? 0 : 60 }}"
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        2208,
+        368
+      ],
+      "id": "3ca04473-3dcb-4d3c-8e53-b8915fc0a623",
+      "name": "Esperar a que finalice la conversacion",
+      "webhookId": "7661296a-2b5b-41e9-beff-abbd565c0c66"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=### Esto no es un prompt de usuario, esto es un prompt de sistema recordandote que no debes responder al usuario, solo generar el perfil técnico como fue solicitado al inicio del prompt ###",
+        "options": {
+          "systemMessage": "Eres el motor de análisis de Estella.\nFORMATO DE SALIDA (JSON ESTRICTO)\n"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3,
+      "position": [
+        2928,
+        352
+      ],
+      "id": "15d4c199-67fa-4bbd-8341-a415a7f54252",
+      "name": "Resumidor"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $('Selector de Prompt').first().json.prompt_dinamico }}",
+        "options": {
+          "systemMessage": "=Eres Estella, una asistente virtual experta en importaciones de Temu.\nTu ÚNICO objetivo es responder al usuario utilizando exactamente el texto que se te entrega en las instrucciones.\nPROHIBIDO usar formato JSON. PROHIBIDO agregar etiquetas como \"analisis\" o \"datos\". Habla siempre como una humana normal."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3,
+      "position": [
+        -496,
+        368
+      ],
+      "id": "84b52525-6c89-4945-92f2-15c82f7dd266",
+      "name": "IA Contestadora"
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "perfil_cliente",
+          "mode": "list",
+          "cachedResultName": "perfil_cliente"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "numero_wp": "={{ $('DataCleaning 1').item.json.numero_cuenta.includes(\"@s.whatsapp.net\") ? $('DataCleaning 1').item.json.numero_cuenta.split(\"@s.whatsapp.net\")[0] : $('DataCleaning 1').item.json.numero_cuenta }}",
+            "fecha_actualizacion": "={{ $now }}",
+            "perfil_usuario": "={{ $('Resumidor').item.json.output }}"
+          },
+          "matchingColumns": [
+            "numero_wp"
+          ],
+          "schema": [
+            {
+              "id": "numero_wp",
+              "displayName": "numero_wp",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "perfil_usuario",
+              "displayName": "perfil_usuario",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "fecha_actualizacion",
+              "displayName": "fecha_actualizacion",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        3488,
+        336
+      ],
+      "id": "9a9c30ac-4cfc-4758-b4b2-804875534edd",
+      "name": "Guardar Perfil en Memoria",
+      "credentials": {
+        "postgres": {
+          "id": "h77TWQT0KvPuJ61k",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "perfil_cliente",
+          "mode": "list",
+          "cachedResultName": "perfil_cliente"
+        },
+        "limit": 1,
+        "where": {
+          "values": [
+            {
+              "column": "numero_wp",
+              "value": "={{ $('DataCleaning 1').item.json.numero_cuenta.includes(\"@s.whatsapp.net\") ? $('DataCleaning 1').item.json.numero_cuenta.split(\"@s.whatsapp.net\")[0] : $('DataCleaning 1').item.json.numero_cuenta }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -3312,
+        448
+      ],
+      "id": "a5470f3a-6982-40b2-9057-1207541cc160",
+      "name": "Buscar Perfil de Cliente",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "h77TWQT0KvPuJ61k",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "e765dfec-58f3-4743-979e-0e6c41fb1acb",
+              "leftValue": "={{ $json.output }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        3248,
+        352
+      ],
+      "id": "caf960c3-9510-44b7-af24-d7e08d7b38d8",
+      "name": "Comprobar Resumen"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "propertyName": "mensajes",
+        "key": "={{ $('DataCleaning 1').item.json.numero_cuenta + \"_idmsj\" }}",
+        "keyType": "list",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        2432,
+        368
+      ],
+      "id": "b4704315-bf3b-4506-bad6-524dae5c3b93",
+      "name": "¿Nuevos Mensajes?",
+      "credentials": {
+        "redis": {
+          "id": "yD0K1YyhMbPXBziG",
+          "name": "Redis account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "b6f957f4-6227-41be-b616-e477cff84049",
+              "leftValue": "={{ $json.mensajes }}",
+              "rightValue": "=0",
+              "operator": {
+                "type": "array",
+                "operation": "empty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2656,
+        368
+      ],
+      "id": "aa0d87cb-36b0-4d5e-ad54-cdb586d57d2b",
+      "name": "Fin Conversacion"
+    },
+    {
+      "parameters": {
+        "content": "Si hay perfil de cliente, buscarlo y concaternarlo con los mensajes",
+        "height": 80,
+        "width": 406
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -3344,
+        624
+      ],
+      "id": "9c2acb7a-18b9-499a-a8e4-c664f4fd0d6c",
+      "name": "Sticky Note10"
+    },
+    {
+      "parameters": {
+        "content": "Espera a que ya no haya mensajes",
+        "height": 80,
+        "width": 150
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1952,
+        64
+      ],
+      "id": "abcfe93d-3c7e-4389-aed6-df3ebd4a823b",
+      "name": "Sticky Note12"
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('DataCleaning 1').item.json.numero_cuenta + \"_ia_V3\" }}",
+        "sessionTTL": "={{ $('DataCleaning 1').item.json.is_testing ? 300 : 3600 }}",
+        "contextWindowLength": 20
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryRedisChat",
+      "typeVersion": 1.5,
+      "position": [
+        1232,
+        912
+      ],
+      "id": "edd580bd-4116-498d-a716-6cb1b4971608",
+      "name": "Redis Chat Memory",
+      "credentials": {
+        "redis": {
+          "id": "yD0K1YyhMbPXBziG",
+          "name": "Redis account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "Si ya no hay mensajes, se ha determinado que ya acabó la conversación",
+        "height": 80,
+        "width": 320
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        2208,
+        256
+      ],
+      "id": "33fe8a3a-a2f1-443a-82e1-ca74a3472fbd",
+      "name": "Sticky Note13"
+    },
+    {
+      "parameters": {
+        "content": "Se resume la conversación y se guarda en postgres",
+        "height": 80,
+        "width": 672
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        2656,
+        240
+      ],
+      "id": "0cfe32c3-8922-4331-902e-30a560a07e36",
+      "name": "Sticky Note14"
+    },
+    {
+      "parameters": {
+        "operation": "delete",
+        "key": "={{ $('DataCleaning 1').item.json.numero_cuenta }}"
+      },
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        -32,
+        368
+      ],
+      "id": "c32e895f-5a8b-484b-8d5d-ae3e747682b6",
+      "name": "Borrar Mensajes Iteración",
+      "credentials": {
+        "redis": {
+          "id": "yD0K1YyhMbPXBziG",
+          "name": "Redis account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "Borra los ultimos mensajes de la iteración",
+        "height": 80,
+        "width": 150
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -48,
+        544
+      ],
+      "id": "393c908e-255b-4217-94a6-f67c67495100",
+      "name": "Sticky Note11"
+    },
+    {
+      "parameters": {
+        "content": "Si los mensajes viene de evolution API, guardar el ID para marcarlos como visto más adelante",
+        "height": 128,
+        "width": 150
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -4496,
+        720
+      ],
+      "id": "3a33592b-114c-4e90-b193-f969bfc02546",
+      "name": "Sticky Note15"
+    },
+    {
+      "parameters": {
+        "model": "llama3.2-vision:latest",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
+      "typeVersion": 1,
+      "position": [
+        1040,
+        912
+      ],
+      "id": "8541f76b-57bf-49da-b0a0-4e4d15e88ab9",
+      "name": "Ollama Chat Model",
+      "credentials": {
+        "ollamaApi": {
+          "id": "fvmNU7DP1nEhmsV1",
+          "name": "Ollama account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "32e8eb8f-0041-4772-a4dd-0cbc92bc04e0",
+              "leftValue": "={{ $('Guardar Mensajes').item.json.tipo_mensaje }}",
+              "rightValue": "=imagen",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            },
+            {
+              "id": "bd5f2f44-d58b-44b4-b87e-b4ea430c7481",
+              "leftValue": "={{ $('Guardar Mensajes').item.json.tipo_mensaje }}",
+              "rightValue": "imageMessage",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -2880,
+        448
+      ],
+      "id": "f0df99cd-bf7b-4baf-b905-9b5173a98d7c",
+      "name": "¿Es imagen?"
+    },
+    {
+      "parameters": {
+        "resource": "media",
+        "operation": "mediaUrlGet",
+        "mediaGetId": "={{ $('DataCleaning 1').item.json.imagen.id }}"
+      },
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        -2288,
+        832
+      ],
+      "id": "55b69ae1-156c-4568-896c-9a7e4251413e",
+      "name": "Obtener URL",
+      "webhookId": "3a87d4a9-b02c-400d-b7db-3acf1b4eed8e",
+      "credentials": {
+        "whatsAppApi": {
+          "id": "pV8OZI5A6zT7baVC",
+          "name": "WP API Sender"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -2096,
+        832
+      ],
+      "id": "91c1dc71-bd42-4b85-90c8-96096ccfedfb",
+      "name": "Descargar Imagen",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "q1F1LLl7zF8DrCOs",
+          "name": "EvolutionApi ApiKey"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "image",
+        "modelId": {
+          "__rl": true,
+          "value": "llama3.2-vision:latest",
+          "mode": "list",
+          "cachedResultName": "llama3.2-vision:latest"
+        },
+        "text": "TAREA: Extracción OCR estricta de una captura de Temu.\nREGLA MÁXIMA: Responde SOLO con un JSON válido. Cero texto fuera del JSON.\n\nINSTRUCCIONES DE EXTRACCIÓN:\n1. \"nombre_producto\": (CRÍTICO) Busca el título largo y descriptivo de la tienda. En pantallas de PC suele estar a la DERECHA de la foto principal. En móviles, justo debajo de la foto. IGNORA logotipos o texto dentro de la imagen del producto.\n2. \"texto_promocion_encontrado\": Busca visualmente la frase literal \"después de las promociones a\". Si la encuentras, cópiala completa. Si NO existe en la imagen, escribe exactamente \"No encontrado\".\n3. \"precio_detectado\": \n   - REGLA A (Prioridad): Si el paso 2 encontró la frase, extrae ÚNICAMENTE el número de esa frase.\n   - REGLA B (Respaldo): Si el paso 2 es \"No encontrado\", busca EXCLUSIVAMENTE el precio que está TACHADO (el que tiene una línea horizontal gris cruzándolo por el medio). IGNORA por completo el número gigante en color naranja.\n   - En ambos casos, usa un punto decimal en lugar de coma. NUNCA inventes números, extrae el real de la imagen.\n4. \"colores_disponibles\": Lee el texto exacto debajo de las miniaturas de variantes (ej: la opción seleccionada o las disponibles). Si no hay, devuelve un arreglo vacío [].\n\nFORMATO OBLIGATORIO:\n{\n  \"nombre_producto\": \"[Escribe el título aquí]\",\n  \"texto_promocion_encontrado\": \"[Escribe la frase o 'No encontrado']\",\n  \"precio_detectado\": \"0.00\",\n  \"colores_disponibles\": [\"Opcion1\", \"Opcion2\"]\n}",
+        "options": {
+          "temperature": 0
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.ollama",
+      "typeVersion": 1,
+      "position": [
+        -2064,
+        432
+      ],
+      "id": "7d18d9f2-2cff-4c60-b72b-df945922cbf3",
+      "name": "Analyze image",
+      "credentials": {
+        "ollamaApi": {
+          "id": "fvmNU7DP1nEhmsV1",
+          "name": "Ollama account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "c654b8cf-e713-4981-aea0-0142ef159ad3",
+              "leftValue": "={{ $json.contiene_url }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -2704,
+        736
+      ],
+      "id": "bd724a66-22da-4164-834b-480c9c3213ee",
+      "name": "Es un enlace?"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "llama3.2-vision:latest",
+          "mode": "list",
+          "cachedResultName": "llama3.2-vision:latest"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=\"Actúa como un extractor de datos de alta precisión. Recibirás un contenido en MARKDOWN de un producto de Temu.\n\nREGLAS DE ORO:\n\nBusca el precio que acompaña al símbolo '$'.\n\nPROHIBICIÓN: El número 593 es un código telefónico. Si ves '593' solo o como parte de un ID, IGNÓRALO. No es un precio.\n\nSi no encuentras un precio claro diferente a 593, devuelve null.\n\nFORMATO DE SALIDA: { \"nombre_producto\": \"string\", \"precio_detectado\": number, \"colores\": [\"string\"] }\n\nCONTENIDO: {{ $json.data.markdown }}\""
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.ollama",
+      "typeVersion": 1,
+      "position": [
+        -1856,
+        624
+      ],
+      "id": "8b09e2a2-0724-4659-9bec-48ae66c23d48",
+      "name": "Analizar Texto (Llama3)",
+      "credentials": {
+        "ollamaApi": {
+          "id": "fvmNU7DP1nEhmsV1",
+          "name": "Ollama account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. EL TRUCO PARA EVITAR LA PÉRDIDA DE DATOS EN REDIS\n// En lugar de leer del nodo anterior, leemos directo del origen:\nlet input = {};\ntry {\n    input = $('Matematicas').first().json;\n} catch (e) {\n    input = $input.first().json || {};\n}\n\nconst mensaje_usuario = $('DataCleaning 1').first().json.mensaje_texto || \"\";\n\nconst es_url = mensaje_usuario.includes(\"http\");\nconst es_imagen = input.es_analisis_imagen === true;\nlet precio_num = parseFloat((input.precio_web || \"0\").toString().replace(/[$,]/g, \"\"));\nconst tiene_precio = !isNaN(precio_num) && precio_num > 0.01;\n\n// DETECCIÓN DE INTENCIÓN DE PAGO (Checkout)\nconst quiere_pagar = /no|pagar|finalizar|listo|comprar|terminar/i.test(mensaje_usuario) && !es_url && !es_imagen;\n\nlet prompt_dinamico = \"\";\n\nif (tiene_precio) {\n    let texto_colores = \"\";\n    if (es_imagen && input.colores && input.colores.length > 0) {\n        texto_colores = `He analizado que este producto cuenta con la siguiente disponibilidad de opciones: ${input.colores.join(\", \")}. ¿Cuál prefieres para tu orden?\\n\\n`;\n    }\n\n    let seccion_carrito = \"\";\n    if (input.cantidad_productos > 1) {\n        let lista_resumen = input.carrito.map(item => `* ${item.nombre.substring(0,40)}... - $${item.total.toFixed(2)}`).join(\"\\n    \");\n        seccion_carrito = `\n    -------------------------------------------\n    (SECCIÓN DEL CARRITO)\n    * **Productos en carrito:**\n    ${lista_resumen}\n    * **TOTAL DE LOS PRODUCTOS A PAGAR:** $${input.gran_total}\n    -------------------------------------------`;\n    }\n\n    prompt_dinamico = `\n    MODO: COTIZACIÓN EXITOSA\n    \n    INSTRUCCIÓN ESTRICTA: Copia el siguiente texto EXACTAMENTE como está.\n\n    PLANTILLA OBLIGATORIA:\n    ¡Hola! Soy Estella, tu asistente de importaciones en Temu.\n\n    **Desglose financiero:**\n\n    * **Producto:** ${input.producto}\n    * **Precio Web:** $${input.precio_web}\n\n    -------------------------------------------\n    * **Subtotal Acumulado:** $${input.precio_web}\n    * **Impuesto Estimado:** $${input.impuesto_estimado}\n    * **TOTAL FINAL A PAGAR:** $${input.total_final_a_pagar}\n    ${seccion_carrito}\n\n    ${texto_colores}¿Desea agregar algún otro producto al carrito o prefiere finalizar la orden?\n    `;\n\n} else if (quiere_pagar && input.cantidad_productos > 0) {\n    let lista_final = input.carrito.map(item => `* ${item.nombre.substring(0,50)}... - $${item.total.toFixed(2)}`).join(\"\\n    \");\n    prompt_dinamico = `\n    MODO: FINALIZAR ORDEN (CHECKOUT)\n    \n    INSTRUCCIÓN ESTRICTA: El usuario ya no quiere agregar más cosas. Muestra el carrito final. Copia la plantilla.\n    \n    PLANTILLA OBLIGATORIA:\n    ¡Excelente! Aquí tienes el resumen final de tu carrito de compras:\n\n    ${lista_final}\n\n    -------------------------------------------\n    * **TOTAL DE LOS PRODUCTOS A PAGAR:** $${input.gran_total}\n    -------------------------------------------\n\n    Para proceder con el pago y la importación, por favor confírmame tu método de pago preferido.\n    `;\n\n} else if (es_url && !tiene_precio) {\n    prompt_dinamico = `MODO: PEDIR CAPTURA\\nEl link fue detectado pero no el precio. Saluda como Estella y pide captura de pantalla.`;\n} else if (es_imagen && !tiene_precio) {\n    prompt_dinamico = `MODO: FALLO VISUAL\\nRecibí una imagen pero no pude leer el precio. Saluda como Estella y pide el precio manual.`;\n} else {\n    prompt_dinamico = `MODO: CONVERSACIÓN\\nInicia tu mensaje con \"¡Hola! Soy Estella...\" y responde al saludo.`;\n}\n\nreturn {\n    prompt_dinamico,\n    producto: input.producto || \"Producto\",\n    precio_web: precio_num.toFixed(2),\n    total_final_a_pagar: input.total_final_a_pagar || \"0\"\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -800,
+        752
+      ],
+      "id": "af918a61-e5c0-451e-b030-16419338a081",
+      "name": "Selector de Prompt"
+    },
+    {
+      "parameters": {
+        "jsCode": "const mensaje_usuario = $('DataCleaning 1').first().json.mensaje_texto || \"\";\nconst es_url = mensaje_usuario.includes(\"http\");\n\nlet precioBase = 0;\nlet nombre = \"Producto\";\nlet colores_detectados = [];\nlet es_imagen = false;\n\n// 1. OBTENER DATOS DEL PRODUCTO ACTUAL\nif (!es_url) {\n    try {\n        const dataImg = $('Limpiar Imagen').first().json;\n        if (dataImg) {\n            precioBase = parseFloat(dataImg.precio_detectado || 0);\n            nombre = dataImg.producto || \"Producto\";\n            colores_detectados = dataImg.colores || [];\n            es_imagen = true;\n        }\n    } catch (e) {}\n} else {\n    try {\n        const dataUrl = $('Extraer Precio').first().json;\n        const inputInicial = $('DataCleaning 1').first().json;\n        if (dataUrl) {\n            precioBase = parseFloat(dataUrl.precio_detectado || 0);\n            nombre = inputInicial.producto || \"Producto Temu\";\n        }\n    } catch (e) {}\n}\n\nif (precioBase >= 592.9 && precioBase <= 593.1) precioBase = 0;\n\n// 2. RECUPERAR EL CARRITO HISTÓRICO (Desde Redis)\nlet carrito = [];\ntry {\n    // Busca si ya hay un carrito guardado en la memoria\n    const redisData = $('Conseguir Carrito').first().json; \n    if (redisData && redisData.carrito_json) {\n        carrito = JSON.parse(redisData.carrito_json);\n    }\n} catch (e) {}\n\n// 3. CÁLCULOS DEL ITEM ACTUAL\nlet impuestos = 0;\nlet total_item = 0;\n\nif (precioBase > 0) {\n    impuestos = 3.00;\n    if (precioBase > 50) impuestos += (precioBase * 0.15); // Lógica de impuestos\n    total_item = precioBase + impuestos;\n\n    // Metemos el producto nuevo a la lista del carrito\n    carrito.push({\n        nombre: nombre,\n        precio: precioBase,\n        impuesto: impuestos,\n        total: total_item\n    });\n}\n\n// 4. CALCULAR EL GRAN TOTAL SUMANDO TODA LA LISTA\nlet gran_total = carrito.reduce((sum, item) => sum + item.total, 0);\n\nreturn {\n    producto: nombre,\n    precio_web: precioBase.toFixed(2),\n    impuesto_estimado: impuestos.toFixed(2),\n    total_final_a_pagar: total_item.toFixed(2),\n    hay_precio: precioBase > 0,\n    colores: colores_detectados,\n    es_analisis_imagen: es_imagen,\n    \n    // VARIABLES DEL CARRITO\n    carrito: carrito,\n    cantidad_productos: carrito.length,\n    gran_total: gran_total.toFixed(2),\n    carrito_json_string: JSON.stringify(carrito) // Esto es vital para guardarlo en Redis luego\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1248,
+        496
+      ],
+      "id": "69dc9846-a91b-430b-8b1c-4503d2a6039e",
+      "name": "Matematicas"
+    },
+    {
+      "parameters": {
+        "jsCode": "const cleaning = $('DataCleaning 1').first().json;\nconst redis_msjs = $input.first().json.mensajes || [];\n\nconst historial_limpio = redis_msjs.reverse().map(m => {\n    return m.replace(/593\\\\d+/g, \"[NÚMERO]\");\n}).join('\\n');\n\n// EXTRA: Detectar si el mensaje actual tiene un link antes de concatenar\nconst mensaje_actual = cleaning.mensaje_texto || \"\";\nconst tiene_link = mensaje_actual.toLowerCase().includes(\"http\");\n\nreturn {\n    nombre_usuario: cleaning.nombre_contacto,\n    mensaje_puro: mensaje_actual, // Solo el texto que acaba de enviar\n    mensajes_usuario: `Nombre del Cliente: ${cleaning.nombre_contacto}\\n\\nHistorial:\\n${historial_limpio}`,\n    contiene_url: tiene_link // Booleano simple para el IF\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3104,
+        448
+      ],
+      "id": "debbe1ba-107b-4012-8c4c-bfb5922a388d",
+      "name": "Concatenar Mensajes"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Obtenemos el HTML crudo del nuevo nodo Browserless\nconst html = $input.first().json.data || \"\";\n\n// ESTRATEGIA 1: Buscar en el JSON oculto de Temu (Data Hydration)\n// Temu suele guardar el precio en variables dentro de <script>\nconst regexJson = /\"amount\"\\s*:\\s*\"(\\d+\\.?\\d*)\"/i;\nconst matchJson = html.match(regexJson);\n\n// ESTRATEGIA 2: Buscar en etiquetas comunes de precio visible\n// Buscamos patrones como $15.99 o US$15.99\nconst regexVisible = /(?:US|USD|\\$)\\s?(\\d{1,3}(?:\\.\\d{2})?)/;\nconst matchVisible = html.match(regexVisible);\n\n// Decisión final\nlet precioFinal = \"0\";\n\nif (matchJson && matchJson[1]) {\n    precioFinal = matchJson[1];\n} else if (matchVisible && matchVisible[1]) {\n    precioFinal = matchVisible[1];\n}\n\n// Filtro anti-error (Evitar que capture el código de país 593 como precio)\nif (parseFloat(precioFinal) >= 592 && parseFloat(precioFinal) <= 594) {\n    precioFinal = \"0\";\n}\n\nreturn [\n  {\n    json: {\n      precio_detectado: precioFinal,\n      // Pasamos el HTML por si quieres depurar, o puedes quitar esta línea para ahorrar RAM\n      debug_html_snippet: html.substring(0, 500) \n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2096,
+        640
+      ],
+      "id": "04bec056-402e-4ff8-a6e4-ccf04da5e7be",
+      "name": "Extraer Precio"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Obtenemos el texto crudo de la IA\nconst response = $input.first().json.content || \"\";\nconst cleanJson = response.replace(/```json\\n?|\\n?```/g, \"\").trim();\n\n// Valores por defecto\nlet producto = \"Producto Detectado\";\nlet precio = \"0\";\nlet colores = [];\n\ntry {\n    // INTENTO 1: ¿El modelo obedeció y envió un JSON válido?\n    const data = JSON.parse(cleanJson);\n    producto = data.nombre_producto || producto;\n    precio = data.precio_detectado || precio;\n    colores = data.colores_disponibles || colores;\n    \n} catch (e) {\n    // INTENTO 2: El modelo falló y envió texto normal (Markdown).\n    // Usamos Expresiones Regulares para \"cazar\" los datos en el texto.\n    \n    // Buscar Nombre (Asume que está en la primera línea entre **)\n    const matchNombre = response.match(/^\\*\\*(.*?)\\*\\*/m) || response.match(/(?:nombre_producto|Producto).*?:?\\s*\\**([^\\n]+)\\**/i);\n    if (matchNombre) producto = matchNombre[1].replace(/\\*\\*/g, \"\").trim();\n\n    // Buscar Precio (Busca el número después de \"Precio Detectado\")\n    const matchPrecio = response.match(/(?:Precio Detectado|precio_detectado)[^0-9]*([0-9]+[.,][0-9]+)/i);\n    if (matchPrecio) precio = matchPrecio[1].trim();\n\n    // Buscar Colores (Busca lo que sigue después de \"Colores Disponibles\")\n    const matchColores = response.match(/(?:Colores Disponibles|colores_disponibles)[^:]*:\\s*\\**([^\\n]+)/i);\n    if (matchColores) {\n        let coloresStr = matchColores[1].replace(/\\*\\*/g, \"\").trim();\n        // Separamos los colores por comas y limpiamos espacios\n        colores = coloresStr.split(\",\").map(c => c.trim());\n    }\n}\n\n// 3. Limpieza final del precio para las Matemáticas\nlet precio_limpio = precio\n    .toString()\n    .replace(\"$\", \"\")\n    .replace(\",\", \".\") // Convierte 24,57 a 24.57\n    .trim();\n\nreturn {\n    producto: producto,\n    precio_detectado: precio_limpio,\n    colores: colores,\n    es_analisis_imagen: true\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1808,
+        432
+      ],
+      "id": "55116e21-6935-4869-be6a-eeb9999bdc54",
+      "name": "Limpiar Imagen"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('DataCleaning 1').first().json.tipo_trigger }}",
+                    "rightValue": "evolution",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "b8a395da-9032-4555-a910-d7deb66be564"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "b573e733-6ea3-4f15-83ab-3cc1a9d304c7",
+                    "leftValue": "={{ $('DataCleaning 1').first().json.tipo_trigger }}",
+                    "rightValue": "oficial",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        -2496,
+        720
+      ],
+      "id": "a93c7b1c-0d1c-419f-b929-038e1476ab6a",
+      "name": "Origen de la Imagen"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:3000/function",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"code\": \"export default async ({ page, context }) => { \\n  // 1. Configurar Headers para parecer un iPhone real \\n  await page.setUserAgent('Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1'); \\n  await page.setExtraHTTPHeaders({'Accept-Language': 'es-EC,es;q=0.9', 'Referer': 'https://www.google.com/'}); \\n\\n  // 2. IMPORTANTE: NO bloquear CSS ni Imágenes (Temu detecta si los bloqueas) \\n  await page.setRequestInterception(true); \\n  page.on('request', req => { \\n    // Solo bloqueamos fuentes para ahorrar un poco, pero dejamos pasar imágenes y estilos \\n    if (['font'].includes(req.resourceType())) req.abort(); \\n    else req.continue(); \\n  }); \\n\\n  // 3. Navegar y esperar 'networkidle2' (Significa: casi no hay tráfico de red, la página cargó) \\n  try { \\n    await page.goto(context.url, { waitUntil: 'networkidle2', timeout: 30000 }); \\n  } catch (e) { \\n    // Si falla por timeout, seguimos intentando leer lo que haya cargado \\n  } \\n\\n  // 4. TRUCO DE ORO: Hacer Scroll hacia abajo \\n  // Temu usa 'Lazy Loading'. Si no bajas, el precio a veces no se carga. \\n  await page.evaluate(async () => { \\n    window.scrollBy(0, 500); \\n    await new Promise(resolve => setTimeout(resolve, 2000)); // Esperar 2 segundos tras scroll \\n  }); \\n\\n  // 5. Devolver el HTML ya 'hidratado' (con datos) \\n  const content = await page.content(); \\n  return content; \\n};\",\n  \"context\": {\n    \"url\": \"{{ $json.mensaje_puro.match(/https?:\\/\\/[^\\s]+/)[0] }}\"\n  }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -2288,
+        640
+      ],
+      "id": "5e450f67-ec00-43c3-baaa-993acd6af701",
+      "name": "Browser Docker"
+    },
+    {
+      "parameters": {
+        "content": "Pregunta si la imagen viene cifrado en base64",
+        "height": 96,
+        "width": 166
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -2736,
+        912
+      ],
+      "id": "8304ab13-4a95-493e-815e-56947e0d0a06",
+      "name": "Sticky Note16"
+    },
+    {
+      "parameters": {
+        "content": "Si es de EvolutionAPI o del Api Oficial se ejecuta de manera diferente",
+        "height": 96,
+        "width": 166
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -2512,
+        912
+      ],
+      "id": "676ffef5-02a4-4458-83b4-013f08b2d8f3",
+      "name": "Sticky Note17"
+    },
+    {
+      "parameters": {
+        "content": "Se lee la imagen y se analiza dicha imagen para sacar el precio, y se intenta llevar un historial de carrito. Se recuerda que la parte del carrito es solo una asistencia, esta parte del cobro lo haría el agente humano personalmente",
+        "height": 80,
+        "width": 1654
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -2592,
+        272
+      ],
+      "id": "36be38f5-8bba-4fa4-8da4-bce4b403cb82",
+      "name": "Sticky Note18"
+    },
+    {
+      "parameters": {
+        "content": "Si es de Oficial se descarga directamente",
+        "height": 80,
+        "width": 150
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -2288,
+        992
+      ],
+      "id": "d30c24ff-df95-44c8-8419-db23f66454d0",
+      "name": "Sticky Note19"
+    },
+    {
+      "parameters": {
+        "content": "Si es de evolution se extrae de un browserless",
+        "height": 80,
+        "width": 150
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -2528,
+        608
+      ],
+      "id": "1bc13853-e800-4674-96c3-b772e9b96e45",
+      "name": "Sticky Note20"
+    },
+    {
+      "parameters": {
+        "content": "Se encarga de la gestión del carrito",
+        "height": 80,
+        "width": 150
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -1264,
+        656
+      ],
+      "id": "7c29cf37-48cb-4ce1-ab24-11469a575bde",
+      "name": "Sticky Note21"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "propertyName": "carrito_json",
+        "key": "==carrito:{{ $('DataCleaning 1').first().json.numero_cuenta }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        -1472,
+        496
+      ],
+      "id": "417011fe-a67c-480b-bdce-82e2c465ebeb",
+      "name": "Conseguir Carrito",
+      "credentials": {
+        "redis": {
+          "id": "yD0K1YyhMbPXBziG",
+          "name": "Redis account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "set",
+        "key": "==carrito:{{ $('DataCleaning 1').first().json.numero_cuenta }}",
+        "value": "=={{ $json.carrito_json_string }}",
+        "expire": true,
+        "ttl": 3600
+      },
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        -1024,
+        496
+      ],
+      "id": "5f411525-0b02-43cc-8131-f804afb592c5",
+      "name": "Guardar en Carrito",
+      "credentials": {
+        "redis": {
+          "id": "yD0K1YyhMbPXBziG",
+          "name": "Redis account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://localhost:8080/chat/getBase64FromMediaMessage/{{ $('DataCleaning 1').item.json.instancia }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"message\": {\n    \"key\": {\n      \"id\": \"{{ $('DataCleaning 1').first().json.id_mensaje }}\"\n    }\n  },\n  \"convertToMp4\": false\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -2608,
+        432
+      ],
+      "id": "d4fc128b-af12-42c9-a8f8-55f7611d3ae4",
+      "name": "Extraer Imagen",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "q1F1LLl7zF8DrCOs",
+          "name": "EvolutionApi ApiKey"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = items[0].json;\nconst binaryData = items[0].binary;\n\n// El nodo HTTP anterior debe devolver un campo 'base64'\n// A veces Evolution lo devuelve dentro de 'data', ajusta si es necesario: item.data?.base64\nconst base64Raw = item.base64 || item.data?.base64;\n\nif (base64Raw) {\n  // Limpiamos cabeceras si existen\n  const base64Clean = base64Raw.replace(/^data:image\\/[a-z]+;base64,/, \"\");\n\n  return [\n    {\n      json: item,\n      binary: {\n        data: {\n          data: base64Clean,\n          mimeType: 'image/jpeg', // Puedes inferirlo o dejarlo fijo\n          fileExtension: 'jpg',\n          fileName: 'imagen_procesada.jpg'\n        }\n      }\n    }\n  ];\n}\n\nreturn items;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2352,
+        432
+      ],
+      "id": "bcc61386-189f-4be8-b365-e125b31c08a0",
+      "name": "Convertir a imagen"
+    }
+  ],
+  "connections": {
+    "DataCleaning 1": {
+      "main": [
+        [
+          {
+            "node": "¿Mensaje tipo consola?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mensaje Consola": {
+      "main": [
+        [
+          {
+            "node": "DataCleaning 1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Finalizar Trigger Mensaje": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Marcar como leído": {
+      "main": [
+        [
+          {
+            "node": "Borrar IDs Mensajes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar estado \"escribiendo\"": {
+      "main": [
+        [
+          {
+            "node": "Enviar mensaje",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar mensaje": {
+      "main": [
+        [
+          {
+            "node": "Enviar Estado No Disponible",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar Estado Disponible": {
+      "main": [
+        [
+          {
+            "node": "Conseguir ID Mensaje",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar Estado No Disponible": {
+      "main": [
+        [
+          {
+            "node": "Esperar a que finalice la conversacion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Evolution API": {
+      "main": [
+        [
+          {
+            "node": "DataCleaning 1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WP API Oficial": {
+      "main": [
+        [
+          {
+            "node": "DataCleaning 1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Redirección Respuesta": {
+      "main": [
+        [
+          {
+            "node": "Enviar Estado Disponible",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Finalizar Trigger Mensaje",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send message": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing9",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guardar Mensajes": {
+      "main": [
+        [
+          {
+            "node": "Esperar a mas mensajes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Conseguir Mensajes": {
+      "main": [
+        [
+          {
+            "node": "¿Ya no hay mas mensajes?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guardar IDs Mensajes": {
+      "main": [
+        [
+          {
+            "node": "Guardar Mensajes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Guardar ID Mensajes?": {
+      "main": [
+        [
+          {
+            "node": "Guardar IDs Mensajes",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Guardar Mensajes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Mensaje tipo consola?": {
+      "main": [
+        [
+          {
+            "node": "IA Contestadora",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "¿Guardar ID Mensajes?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Ya no hay mas mensajes?": {
+      "main": [
+        [
+          {
+            "node": "Buscar Perfil de Cliente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Conseguir ID Mensaje": {
+      "main": [
+        [
+          {
+            "node": "Estructurar Body Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Estructurar Body Request": {
+      "main": [
+        [
+          {
+            "node": "Marcar como leído",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Borrar IDs Mensajes": {
+      "main": [
+        [
+          {
+            "node": "Enviar estado \"escribiendo\"",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "No Operation, do nothing1": {
+      "main": [
+        [
+          {
+            "node": "Esperar a que finalice la conversacion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "No Operation, do nothing2": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "No Operation, do nothing3": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "No Operation, do nothing4": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "No Operation, do nothing5": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing6",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "No Operation, do nothing6": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing7",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "No Operation, do nothing7": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "No Operation, do nothing8": {
+      "main": [
+        [
+          {
+            "node": "Esperar a que finalice la conversacion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "No Operation, do nothing9": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing10",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "No Operation, do nothing10": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing11",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "No Operation, do nothing11": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing12",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "No Operation, do nothing12": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing13",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "No Operation, do nothing13": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing14",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "No Operation, do nothing14": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing8",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Esperar a mas mensajes": {
+      "main": [
+        [
+          {
+            "node": "Conseguir Mensajes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Esperar a que finalice la conversacion": {
+      "main": [
+        [
+          {
+            "node": "¿Nuevos Mensajes?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resumidor": {
+      "main": [
+        [
+          {
+            "node": "Comprobar Resumen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IA Contestadora": {
+      "main": [
+        [
+          {
+            "node": "Borrar Mensajes Iteración",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar Perfil de Cliente": {
+      "main": [
+        [
+          {
+            "node": "Concatenar Mensajes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Comprobar Resumen": {
+      "main": [
+        [
+          {
+            "node": "Guardar Perfil en Memoria",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Resumidor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Nuevos Mensajes?": {
+      "main": [
+        [
+          {
+            "node": "Fin Conversacion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fin Conversacion": {
+      "main": [
+        [
+          {
+            "node": "Resumidor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Redis Chat Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "Resumidor",
+            "type": "ai_memory",
+            "index": 0
+          },
+          {
+            "node": "IA Contestadora",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Borrar Mensajes Iteración": {
+      "main": [
+        [
+          {
+            "node": "Redirección Respuesta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "IA Contestadora",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Resumidor",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Es imagen?": {
+      "main": [
+        [
+          {
+            "node": "Extraer Imagen",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Es un enlace?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Obtener URL": {
+      "main": [
+        [
+          {
+            "node": "Descargar Imagen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Descargar Imagen": {
+      "main": [
+        [
+          {
+            "node": "Analizar Texto (Llama3)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze image": {
+      "main": [
+        [
+          {
+            "node": "Limpiar Imagen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Es un enlace?": {
+      "main": [
+        [
+          {
+            "node": "Origen de la Imagen",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Selector de Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analizar Texto (Llama3)": {
+      "main": [
+        [
+          {
+            "node": "Conseguir Carrito",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Selector de Prompt": {
+      "main": [
+        [
+          {
+            "node": "IA Contestadora",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Matematicas": {
+      "main": [
+        [
+          {
+            "node": "Guardar en Carrito",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Concatenar Mensajes": {
+      "main": [
+        [
+          {
+            "node": "¿Es imagen?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extraer Precio": {
+      "main": [
+        [
+          {
+            "node": "Analizar Texto (Llama3)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Limpiar Imagen": {
+      "main": [
+        [
+          {
+            "node": "Conseguir Carrito",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Origen de la Imagen": {
+      "main": [
+        [
+          {
+            "node": "Browser Docker",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Obtener URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Browser Docker": {
+      "main": [
+        [
+          {
+            "node": "Extraer Precio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Conseguir Carrito": {
+      "main": [
+        [
+          {
+            "node": "Matematicas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guardar en Carrito": {
+      "main": [
+        [
+          {
+            "node": "Selector de Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extraer Imagen": {
+      "main": [
+        [
+          {
+            "node": "Convertir a imagen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convertir a imagen": {
+      "main": [
+        [
+          {
+            "node": "Analyze image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "e64d424fa834962a8cfa47f64fd408468bc49b43388ae2201059bf9f952a26dd"
+  }
+}
