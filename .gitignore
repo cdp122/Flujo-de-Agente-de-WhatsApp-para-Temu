@@ -54,3 +54,6 @@ Thumbs.db
 # Logs generales
 logs/
 *.log
+
+#server de python
+.venv/
