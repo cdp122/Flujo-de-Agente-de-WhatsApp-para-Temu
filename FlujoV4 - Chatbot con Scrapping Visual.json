@@ -2,7 +2,7 @@
   "nodes": [
     {
       "parameters": {
-        "jsCode": "/*******************************\n * CONFIGURACIÓN GENERAL\n *******************************/\nconst dominio_evolution = \"http://localhost:8080\";\n\n/*******************************\n * WHITELIST DE NÚMEROS\n *******************************/\nconst numeros_admitidos = [\n  \"593997350897\",\n  \"593980062977\",\n  \"593978640544\",\n  \"593997129254\",\n  \"593995817315\",\n  \"593988207600\"\n];\n\n/*******************************\n * FUNCIÓN WHITELIST\n *******************************/\nfunction comprobar_whitelist(numero, evolutional) {\n  if (!numero) return false;\n\n  // Limpiar número si viene de evolution (quita el @s.whatsapp.net)\n  let numero_limpio = numero;\n  if (evolutional && typeof numero === \"string\") {\n    numero_limpio = numero.split(\"@\")[0];\n  }\n\n  // Si es Evolution y el mensaje es enviado por el bot (fromMe), cortamos flujo\n  if (evolutional && $input.first().json.body?.data?.key?.fromMe) {\n    return null; // señal explícita de corte (mensaje propio)\n  }\n\n  return numeros_admitidos.includes(numero_limpio);\n}\n\n/*******************************\n * OBJETO BASE\n *******************************/\nlet datos = {\n  dominio_evolution\n};\n\n/*******************************\n * 1. TRIGGER DESDE CONSOLA\n *******************************/\nif ($input.first().json.action) {\n  datos.tipo_trigger = \"consola\";\n  datos.numero_cuenta = \"Consola\";\n  datos.nombre_contacto = \"Admin\";\n  datos.mensaje_texto = $input.first().json.chatInput;\n\n  return datos;\n}\n\n/*******************************\n * 2. TRIGGER DESDE EVOLUTION API\n *******************************/\nif ($input.first().json.body?.data?.messageType) {\n  const body = $input.first().json.body;\n\n  datos.tipo_trigger = \"evolution\";\n\n  const permitido = comprobar_whitelist(\n    body.data.key.remoteJid,\n    true\n  );\n\n  // Cortar flujo si es mensaje propio del bot o no permitido (según lógica deseada)\n  if (permitido === null) return []; // Es mensaje propio\n  \n  // Opcional: Si quieres bloquear números no admitidos en Evolution descomenta esto:\n  // if (!permitido) return []; \n\n  datos.is_testing = permitido;\n  datos.instancia = body.instance;\n  datos.numero_cuenta = body.data.key.remoteJid;\n\n  // SOLUCIÓN NOMBRE NULL O NUMÉRICO\n  const pushName = body.data.pushName;\n  datos.nombre_contacto =\n    pushName && isNaN(pushName) ? pushName : \"Cliente\";\n\n  datos.id_mensaje = body.data.key.id;\n  datos.tipo_mensaje = body.data.messageType;\n\n  // Recuperar texto (sea texto puro o caption de imagen)\n  datos.mensaje_texto =\n    body.data.message.conversation ||\n    body.data.message.extendedTextMessage?.text || \n    body.data.message.imageMessage?.caption ||\n    \"\";\n\n  return datos;\n}\n\n/*******************************\n * 3. TRIGGER DESDE WHATSAPP API OFICIAL (META)\n * (Este es el bloque que faltaba)\n *******************************/\nif ($input.first().json.messaging_product === \"whatsapp\") {\n  \n  datos.tipo_trigger = \"oficial\";\n\n  // Meta suele enviar arrays, tomamos el primero\n  const msg = $input.first().json.messages?.[0];\n  const contact = $input.first().json.contacts?.[0];\n\n  // Si no hay mensaje o contacto, cortamos\n  if (!msg || !contact) return [];\n\n  // Verificamos whitelist (False porque no es evolution)\n  const permitido = comprobar_whitelist(contact.wa_id, false);\n  \n  // AQUÍ DECIDES: ¿Si no está en whitelist cortas el flujo?\n  // Asumiremos que si no está permitido, retornamos vacío para no procesar.\n  // Si quieres que pase aunque no esté en la lista, borra la linea de abajo.\n  if (!permitido) return []; \n\n  datos.is_testing = permitido;\n  datos.numero_cuenta = contact.wa_id;\n  datos.id_mensaje = msg.id;\n  datos.nombre_contacto = contact.profile?.name || \"Desconocido\";\n  \n  // Normalizar tipo de mensaje\n  if (msg.type === \"text\") {\n    datos.tipo_mensaje = \"conversation\"; // Para mantener consistencia con Evolution\n    datos.mensaje_texto = msg.text.body;\n  } else if (msg.type === \"image\") {\n    datos.tipo_mensaje = \"imageMessage\";\n    datos.mensaje_texto = msg.image.caption || \"\";\n    datos.imagen = {\n        id: msg.image.id,\n        mime: msg.image.mime_type\n    };\n  } else {\n      datos.tipo_mensaje = msg.type;\n      datos.mensaje_texto = \"\";\n  }\n\n  return datos;\n}\n\n/*******************************\n * SI NO COINCIDE NINGÚN TRIGGER\n *******************************/\nreturn [];"
+        "jsCode": "const produccion = true;\n\n/*******************************\n * CONFIGURACIÓN GENERAL\n *******************************/\nconst dominio_evolution = \"http://localhost:8080\";\n\n/*******************************\n * WHITELIST DE NÚMEROS\n *******************************/\nconst numeros_admitidos = [\n  \"593997350897\",\n  \"593980062977\",\n  \"593978640544\",\n  \"593997129254\",\n  \"593995817315\",\n  \"593988207600\"\n];\n\n/*******************************\n * FUNCIÓN WHITELIST\n *******************************/\nfunction comprobar_whitelist(numero, evolutional) {\n  if (!numero) return false;\n\n  // Limpiar número si viene de evolution (quita el @s.whatsapp.net)\n  let numero_limpio = numero;\n  if (evolutional && typeof numero === \"string\") {\n    numero_limpio = numero.split(\"@\")[0];\n  }\n\n  // Si es Evolution y el mensaje es enviado por el bot (fromMe), cortamos flujo\n  if (evolutional && $input.first().json.body?.data?.key?.fromMe) {\n    return null; // señal explícita de corte (mensaje propio)\n  }\n\n  return numeros_admitidos.includes(numero_limpio);\n}\n\n/*******************************\n * OBJETO BASE\n *******************************/\nlet datos = {\n  dominio_evolution\n};\n\n/*******************************\n * 1. TRIGGER DESDE CONSOLA\n *******************************/\nif ($input.first().json.action) {\n  datos.tipo_trigger = \"consola\";\n  datos.numero_cuenta = \"Consola\";\n  datos.nombre_contacto = \"Admin\";\n  datos.mensaje_texto = $input.first().json.chatInput;\n\n  return datos;\n}\n\n/*******************************\n * 2. TRIGGER DESDE EVOLUTION API\n *******************************/\nif ($input.first().json.body?.data?.messageType) {\n  const body = $input.first().json.body;\n\n  datos.tipo_trigger = \"evolution\";\n\n  const permitido = comprobar_whitelist(\n    body.data.key.remoteJid,\n    true\n  );\n\n  // Cortar flujo si es mensaje propio del bot o no permitido (según lógica deseada)\n  if (permitido === null) return []; // Es mensaje propio\n  \n  // Opcional: Si quieres bloquear números no admitidos en Evolution descomenta esto:\n  // if (!permitido) return []; \n\n  datos.is_testing = !produccion;\n  datos.instancia = body.instance;\n  datos.numero_cuenta = body.data.key.remoteJid;\n\n  // SOLUCIÓN NOMBRE NULL O NUMÉRICO\n  const pushName = body.data.pushName;\n  datos.nombre_contacto =\n    pushName && isNaN(pushName) ? pushName : \"Cliente\";\n\n  datos.id_mensaje = body.data.key.id;\n  datos.tipo_mensaje = body.data.messageType;\n\n  // Recuperar texto (sea texto puro o caption de imagen)\n  datos.mensaje_texto =\n    body.data.message.conversation ||\n    body.data.message.extendedTextMessage?.text || \n    body.data.message.imageMessage?.caption ||\n    \"\";\n\n  return datos;\n}\n\n/*******************************\n * 3. TRIGGER DESDE WHATSAPP API OFICIAL (META)\n * (Este es el bloque que faltaba)\n *******************************/\nif ($input.first().json.messaging_product === \"whatsapp\") {\n  \n  datos.tipo_trigger = \"oficial\";\n\n  // Meta suele enviar arrays, tomamos el primero\n  const msg = $input.first().json.messages?.[0];\n  const contact = $input.first().json.contacts?.[0];\n\n  // Si no hay mensaje o contacto, cortamos\n  if (!msg || !contact) return [];\n\n  // Verificamos whitelist (False porque no es evolution)\n  const permitido = comprobar_whitelist(contact.wa_id, false);\n  \n  // AQUÍ DECIDES: ¿Si no está en whitelist cortas el flujo?\n  // Asumiremos que si no está permitido, retornamos vacío para no procesar.\n  // Si quieres que pase aunque no esté en la lista, borra la linea de abajo.\n  if (!permitido) return []; \n\n  datos.is_testing = !produccion;\n  datos.numero_cuenta = contact.wa_id;\n  datos.id_mensaje = msg.id;\n  datos.nombre_contacto = contact.profile?.name || \"Desconocido\";\n  \n  // Normalizar tipo de mensaje\n  if (msg.type === \"text\") {\n    datos.tipo_mensaje = \"conversation\"; // Para mantener consistencia con Evolution\n    datos.mensaje_texto = msg.text.body;\n  } else if (msg.type === \"image\") {\n    datos.tipo_mensaje = \"imageMessage\";\n    datos.mensaje_texto = msg.image.caption || \"\";\n    datos.imagen = {\n        id: msg.image.id,\n        mime: msg.image.mime_type\n    };\n  } else {\n      datos.tipo_mensaje = msg.type;\n      datos.mensaje_texto = \"\";\n  }\n\n  return datos;\n}\n\n/*******************************\n * SI NO COINCIDE NINGÚN TRIGGER\n *******************************/\nreturn [];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -180,7 +180,7 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        -8768,
+        -8736,
         1872
       ],
       "id": "cd477b07-a26f-4e26-8182-2fc9826c887c",
@@ -244,8 +244,8 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        -4704,
-        2144
+        -4672,
+        2192
       ],
       "id": "2d921281-4fe3-4924-9555-d27ab92d446c",
       "name": "Sticky Note5"
@@ -260,7 +260,7 @@
       "typeVersion": 1,
       "position": [
         -4192,
-        2144
+        2208
       ],
       "id": "e66eccff-ffc9-400f-af24-f36ae5b3b285",
       "name": "Sticky Note6"
@@ -451,7 +451,7 @@
       "typeVersion": 1,
       "position": [
         -8320,
-        2040
+        2048
       ],
       "id": "5cd5b10e-a086-4dee-bd2d-c9ef2309e288",
       "name": "Guardar Mensajes",
@@ -474,7 +474,7 @@
       "typeVersion": 1,
       "position": [
         -7872,
-        2040
+        2048
       ],
       "id": "6222de1e-9a89-4b8b-85a0-8b1708db18a5",
       "name": "Conseguir Mensajes",
@@ -549,7 +549,7 @@
       "typeVersion": 2.3,
       "position": [
         -8768,
-        2040
+        2048
       ],
       "id": "3993226c-ae91-43eb-94c2-02fb4d890a48",
       "name": "¿Guardar ID Mensajes?"
@@ -616,7 +616,7 @@
       "typeVersion": 2.3,
       "position": [
         -7648,
-        2040
+        2048
       ],
       "id": "7f49cc57-d2f9-46ad-afaf-60c15ff0a6be",
       "name": "¿Ya no hay mas mensajes?"
@@ -833,13 +833,13 @@
     },
     {
       "parameters": {
-        "amount": "={{ $('DataCleaning 1').item.json.is_testing ? 0 : 60 }}"
+        "amount": "={{ $('DataCleaning 1').item.json.is_testing ? 0 : 30 }}"
       },
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
       "position": [
         -8096,
-        2040
+        2048
       ],
       "id": "57eb02d0-a7d2-4cfd-84e9-d90412b2034a",
       "name": "Esperar a mas mensajes",
@@ -996,7 +996,7 @@
       "typeVersion": 2.6,
       "position": [
         -7424,
-        2040
+        2048
       ],
       "id": "d1ff03b9-5770-4112-8ead-536d42ec386a",
       "name": "Buscar Perfil de Cliente",
@@ -1123,8 +1123,8 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        -1952,
-        1664
+        -2080,
+        1760
       ],
       "id": "e50ba8b2-591b-4a4f-b420-5fb08585cc80",
       "name": "Sticky Note12"
@@ -1139,8 +1139,8 @@
       "type": "@n8n/n8n-nodes-langchain.memoryRedisChat",
       "typeVersion": 1.5,
       "position": [
-        -1336,
-        2192
+        -3136,
+        2624
       ],
       "id": "19ca1007-b4d9-405f-b67e-a4a1f409fc31",
       "name": "Redis Chat Memory",
@@ -1211,7 +1211,7 @@
       "typeVersion": 1,
       "position": [
         -4400,
-        2144
+        2192
       ],
       "id": "b78b66e1-d486-4f0d-9c1c-ebfcc2f83897",
       "name": "Sticky Note11"
@@ -1239,8 +1239,8 @@
       "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
       "typeVersion": 1,
       "position": [
-        -1464,
-        2192
+        -3264,
+        2624
       ],
       "id": "33562afa-cf31-4a41-93f1-8e00d44be109",
       "name": "Ollama Chat Model",
@@ -1290,7 +1290,7 @@
       "typeVersion": 2.3,
       "position": [
         -6976,
-        2040
+        2048
       ],
       "id": "c94d4ad3-ea25-467c-910b-017e2506e3e1",
       "name": "¿Es imagen?"
@@ -1353,7 +1353,7 @@
       "typeVersion": 2.3,
       "position": [
         -6752,
-        2176
+        2240
       ],
       "id": "b4153033-61c3-4def-9395-c71ee6cde854",
       "name": "Es un enlace?"
@@ -1366,7 +1366,7 @@
       "typeVersion": 2,
       "position": [
         -4960,
-        2136
+        2144
       ],
       "id": "61c0f6a1-0f19-460b-8751-c6ceac01dacd",
       "name": "Selector de Prompt"
@@ -1392,7 +1392,7 @@
       "typeVersion": 2,
       "position": [
         -7200,
-        2040
+        2048
       ],
       "id": "ae9afb8f-37a8-48a5-9262-b8b5187a097a",
       "name": "Concatenar Mensajes"
@@ -1412,34 +1412,6 @@
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "http://127.0.0.1:8000/capturar",
-        "sendBody": true,
-        "bodyParameters": {
-          "parameters": [
-            {
-              "name": "url",
-              "value": "={{ $json.mensaje_puro.match(/https?:\\/\\/[^\\s]+/)[0] }}"
-            },
-            {
-              "name": "time",
-              "value": "6"
-            }
-          ]
-        },
-        "options": {}
-      },
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.3,
-      "position": [
-        -6528,
-        2160
-      ],
-      "id": "6090e103-c404-480f-8959-9604316b015c",
-      "name": "Browser Docker"
-    },
-    {
-      "parameters": {
         "content": "Pregunta si la imagen viene cifrado en base64",
         "height": 96,
         "width": 166
@@ -1447,7 +1419,7 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        -6768,
+        -6784,
         2384
       ],
       "id": "cf616d98-d3f0-4f64-866f-1f363a5513fc",
@@ -1462,7 +1434,7 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        -6544,
+        -6560,
         2384
       ],
       "id": "2a336803-0aed-44b3-b087-b0f0778ee3be",
@@ -1477,8 +1449,8 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        -6080,
-        1840
+        -5600,
+        1824
       ],
       "id": "e9ce96ab-5923-4e3b-acd0-92ec515371ba",
       "name": "Sticky Note18"
@@ -1492,7 +1464,7 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        -6320,
+        -6336,
         2384
       ],
       "id": "0957c878-acf4-4767-b181-eb75c0844c2a",
@@ -1687,6 +1659,34 @@
       ],
       "id": "41b937c3-f3f2-4f33-8a25-f3762594e3d5",
       "name": "Convert to File"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:8000/capturar",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "url",
+              "value": "={{ $json.mensaje_puro.match(/https?:\\/\\/[^\\s]+/)[0] }}"
+            },
+            {
+              "name": "time",
+              "value": "6"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -6528,
+        2160
+      ],
+      "id": "6090e103-c404-480f-8959-9604316b015c",
+      "name": "Server Scrapping"
     }
   ],
   "connections": {
@@ -2274,7 +2274,7 @@
       "main": [
         [
           {
-            "node": "Browser Docker",
+            "node": "Server Scrapping",
             "type": "main",
             "index": 0
           }
@@ -2326,17 +2326,6 @@
         [
           {
             "node": "Conseguir Carrito",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Browser Docker": {
-      "main": [
-        [
-          {
-            "node": "Convert to File",
             "type": "main",
             "index": 0
           }
@@ -2437,9 +2426,143 @@
           }
         ]
       ]
+    },
+    "Server Scrapping": {
+      "main": [
+        [
+          {
+            "node": "Convert to File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
-  "pinData": {},
+  "pinData": {
+    "Evolution API": [
+      {
+        "headers": {
+          "accept": "application/json, text/plain, */*",
+          "content-type": "application/json",
+          "user-agent": "axios/1.13.2",
+          "content-length": "2711",
+          "accept-encoding": "gzip, compress, deflate, br",
+          "host": "localhost:5678",
+          "connection": "keep-alive"
+        },
+        "params": {},
+        "query": {},
+        "body": {
+          "event": "messages.upsert",
+          "instance": "n8n",
+          "data": {
+            "key": {
+              "remoteJid": "593995817315@s.whatsapp.net",
+              "remoteJidAlt": "115646356557828@lid",
+              "fromMe": false,
+              "id": "3AAD6A3AA1874BC9CE54",
+              "participant": "",
+              "addressingMode": "pn"
+            },
+            "pushName": "Sebastian",
+            "status": "DELIVERY_ACK",
+            "message": {
+              "messageContextInfo": {
+                "threadId": [],
+                "deviceListMetadata": {
+                  "senderKeyIndexes": [],
+                  "recipientKeyIndexes": [],
+                  "senderKeyHash": {
+                    "0": 88,
+                    "1": 190,
+                    "2": 58,
+                    "3": 227,
+                    "4": 223,
+                    "5": 168,
+                    "6": 102,
+                    "7": 186,
+                    "8": 15,
+                    "9": 123
+                  },
+                  "senderTimestamp": {
+                    "low": 1771459090,
+                    "high": 0,
+                    "unsigned": true
+                  },
+                  "recipientKeyHash": {
+                    "0": 42,
+                    "1": 159,
+                    "2": 236,
+                    "3": 67,
+                    "4": 239,
+                    "5": 4,
+                    "6": 47,
+                    "7": 224,
+                    "8": 185,
+                    "9": 115
+                  },
+                  "recipientTimestamp": {
+                    "low": 1771338683,
+                    "high": 0,
+                    "unsigned": true
+                  }
+                },
+                "deviceListMetadataVersion": 2,
+                "messageSecret": {
+                  "0": 206,
+                  "1": 119,
+                  "2": 157,
+                  "3": 141,
+                  "4": 42,
+                  "5": 178,
+                  "6": 220,
+                  "7": 177,
+                  "8": 230,
+                  "9": 226,
+                  "10": 223,
+                  "11": 130,
+                  "12": 66,
+                  "13": 174,
+                  "14": 67,
+                  "15": 60,
+                  "16": 185,
+                  "17": 247,
+                  "18": 159,
+                  "19": 77,
+                  "20": 191,
+                  "21": 182,
+                  "22": 211,
+                  "23": 46,
+                  "24": 6,
+                  "25": 146,
+                  "26": 90,
+                  "27": 50,
+                  "28": 51,
+                  "29": 240,
+                  "30": 193,
+                  "31": 174
+                }
+              },
+              "conversation": "https://www.temu.com/ec/cargador-inalambrico-para-magsafe-optimizado-para-iphone-serie-12-17--maxima-de-15w-carga-rapida-conector-usb-tipo-c-g-601102676277131.html?_oak_mp_inf=EIvv%2BPux1ogBGhZmbGFzaF9zYWxlX2xpc3RfZzEza2w3IPzzwpvHMw%3D%3D&top_gallery_url=https%3A%2F%2Fimg.kwcdn.com%2Fproduct%2Ffancy%2F1413fcff-01b8-4b4a-87ec-6ccf679bd981.jpg&spec_gallery_id=24998835671&refer_page_sn=10132&freesia_scene=116&_oak_freesia_scene=116&_oak_rec_ext_1=Mzg2&_oak_gallery_order=52567055%2C44558697%2C1331373930%2C331390383%2C920541193&refer_page_el_sn=201401&_x_channel_src=1&_x_channel_scene=spike&_x_vst_scene=adg&_x_ads_channel=google&_x_ads_sub_channel=search&_x_ads_account=9048559886&_x_ads_set=21909852444&_x_ads_id=169281001134&_x_ads_creative_id=721696425589&_x_ns_source=g&_x_ns_gclid=Cj0KCQiA-YvMBhDtARIsAHZuUzIy84dTsTq7xN0TRZQOG1MYFnG_OFQrR6Wd4ig0tKecbsnGgRJjflkaAs24EALw_wcB&_x_ns_placement=&_x_ns_match_type=e&_x_ns_ad_position=&_x_ns_product_id=&_x_ns_target=&_x_ns_devicemodel=&_x_ns_wbraid=CkEKCQiA1obMBhD-ARIwAP_O-62yC5uR_G65R6eA9h1zme1VwDEUeXI0IItMF6lxBrz62OBwyAAuXzWxFMzeGgLC4A&_x_ns_gbraid=0AAAAAo4mICHMzYHpbrYN3O73xor4BIcOG&_x_ns_keyword=temu&_x_ns_targetid=kwd-4583699489&_x_ns_extensionid=&_x_sessn_id=yixoyzynqo&refer_page_name=lightning-deals&refer_page_id=10132_1771463294836_6dqopqx1cy"
+            },
+            "contextInfo": null,
+            "messageType": "conversation",
+            "messageTimestamp": 1771473985,
+            "instanceId": "706f11e7-140e-487b-9319-a0061f48d1f4",
+            "source": "ios"
+          },
+          "destination": "http://localhost:5678/webhook-test/prueba",
+          "date_time": "2026-02-18T23:06:25.519Z",
+          "sender": "593988207600@s.whatsapp.net",
+          "server_url": "http://localhost:8080",
+          "apikey": "431D956295EF-494C-A5B3-B64D7B682678"
+        },
+        "webhookUrl": "http://localhost:5678/webhook-test/prueba",
+        "executionMode": "test"
+      }
+    ]
+  },
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "e64d424fa834962a8cfa47f64fd408468bc49b43388ae2201059bf9f952a26dd"
